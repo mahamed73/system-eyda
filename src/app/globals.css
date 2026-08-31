@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/*
+ * النظام مصمم كـ Light Theme ثابت (بناءً على قرارك)، فمبنعتمدش على
+ * تفضيل الوضع الداكن بتاع الجهاز/المتصفح. `color-scheme: light` بيمنع
+ * المتصفح من "تغميق" عناصر الفورم (input/select) تلقائيًا حتى لو
+ * الجهاز شغال Dark Mode.
+ */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-cairo);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-cairo), Arial, Helvetica, sans-serif;
+}
+
+/* ضمان إضافي: لون نص واضح وخلفية بيضاء لكل حقول الإدخال في كل الصفحات،
+   بغض النظر عن أي إعداد Dark Mode عند المستخدم. */
+input,
+textarea,
+select {
+  color: #0f172a; /* slate-900 */
+  background-color: #ffffff;
+}
+
+/* حركة ظهور الـ toast من تحت */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 0.25s ease-out;
+}
