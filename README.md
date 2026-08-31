@@ -636,9 +636,11 @@ scripts/test-new-modules.js                             # اختبار تكام�
 ### تشغيل PostgreSQL محليًا بدون apt (الساندبوكس)
 
 لو `apt install postgresql` مش متاح (زي ما بيحصل في بعض بيئات الـ sandbox)،
-فيه سكريبت بديل بيستخدم نسخة Postgres مدمّجة عبر npm:
+فيه سكريبت بديل بيستخدم نسخة Postgres مدمّجة عبر npm (مش جزء من تبعيات
+الإنتاج، بتتثبّت محليًا للساندبوكس فقط):
 
 ```bash
+npm install --no-save embedded-postgres @embedded-postgres/linux-x64
 node scripts/dev-postgres.js setup    # أول مرة (initdb + إنشاء الداتابيز)
 node scripts/dev-postgres.js          # تشغيل في الخلفية (يبقى شغال)
 node scripts/migrate.js && node scripts/seed-demo.js
