@@ -30,6 +30,7 @@ services:
       # في وضع الدومين: https://الدومين — في وضع الـ IP: الأكشن بيضبطه
       # من .env.docker على http://<IP> (override بورت 80).
       NEXTAUTH_URL: ${NEXTAUTH_URL:-https://${DOMAIN}}
+      AUTH_TRUST_HOST: "true"
       NODE_ENV: production
       TZ: Africa/Cairo
     volumes:
