@@ -102,8 +102,11 @@ $DC $PROFILE_ARG ps || true
 
 echo "==> 7) فحص التطبيق"
 OK=0
+# ملاحظة: Caddy بيعمل تحويل HTTP -> HTTPS (308)، فالفحص لازم يكون على HTTPS
+# مع تجاهل الشهادة في الفحص المحلي (--resolve بيوجّه الدومين لـ localhost).
+HEALTH_CHECK="curl -sk -o /dev/null -w '%{http_code}' --resolve ${DOMAIN:-localhost}:443:127.0.0.1 https://${DOMAIN:-localhost}/api/health"
 for i in $(seq 1 30); do
-  CODE="$(curl -s -o /dev/null -w '%{http_code}' http://localhost/api/health || true)"
+  CODE="$(eval "$HEALTH_CHECK" || true)"
   echo "محاولة $i: HTTP $CODE"
   if [ "$CODE" = "200" ]; then OK=1; break; fi
   sleep 6
