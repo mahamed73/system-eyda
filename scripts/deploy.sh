@@ -14,6 +14,28 @@ REPO_URL="https://github.com/mahamed73/system-eyda.git"
 APP_DIR="/opt/clinic-saas"
 SERVER_IP="$(curl -s https://api.ipify.org || echo '')"
 
+# الدومين الافتراضي (يقدر يتغير عبر DOMAIN=... قبل التشغيل)
+DEFAULT_DOMAIN="clinic1.easychat.cloud"
+DOMAIN="${DOMAIN:-$DEFAULT_DOMAIN}"
+
+echo "==> 0) تجهيزات السيرفر: ملف swap لو الرام صغير + تحرير بورت 80/443"
+# بناية Next.js محتاجة رام كافية؛ لو السيرفر صغير بنعمل swap تلقائيًا.
+TOTAL_MEM_MB="$(free -m 2>/dev/null | awk '/Mem:/ {print $2}' || echo 9999)"
+if [ "$TOTAL_MEM_MB" -lt 1800 ] && ! swapon --show 2>/dev/null | grep -q swap; then
+  if [ ! -f /swapfile ]; then
+    fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048
+    chmod 600 /swapfile
+    mkswap /swapfile >/dev/null
+  fi
+  swapon /swapfile || true
+  grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  echo "تم تفعيل swap 2 جيجا"
+fi
+# نتأكد إن بورت 80/443 مش مستخدمين من خدمة تانية (apache/nginx قديم)
+for svc in apache2 nginx caddy httpd; do
+  systemctl disable --now "$svc" 2>/dev/null || true
+done
+
 echo "==> 1) تثبيت Docker لو مش موجود"
 if ! command -v docker >/dev/null 2>&1; then
   curl -fsSL https://get.docker.com | sh
