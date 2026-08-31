@@ -128,6 +128,18 @@ async function main() {
   );
   const clinicId = clinicRes.rows[0].id;
 
+  // تفعيل الحجز الأونلاين افتراضيًا في العيادة التجريبية
+  await client.query(
+    `UPDATE clinics
+       SET booking_slug = 'clinic1',
+           online_booking_enabled = true,
+           booking_slot_minutes = 30,
+           work_start_time = '16:00',
+           work_end_time = '23:00'
+     WHERE id = $1`,
+    [clinicId]
+  );
+
   const docHash = await bcrypt.hash(demo.doctorPassword, 10);
   const recHash = await bcrypt.hash(demo.receptionistPassword, 10);
 
