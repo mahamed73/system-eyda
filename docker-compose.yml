@@ -27,16 +27,20 @@ services:
     environment:
       DATABASE_URL: postgresql://clinic_app:${DB_PASSWORD}@db:5432/clinic_saas
       AUTH_SECRET: ${AUTH_SECRET}
-      NEXTAUTH_URL: https://${DOMAIN}
+      # في وضع الدومين: https://الدومين — في وضع الـ IP: الأكشن بيضبطه
+      # من .env.docker على http://<IP> (override بورت 80).
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://${DOMAIN}}
       NODE_ENV: production
       TZ: Africa/Cairo
     volumes:
       - uploads_data:/app/storage/uploads
-    expose:
-      - "3000"
 
+  # Caddy (SSL تلقائي) — بيشتغل فقط لما يكون فيه دومين (--profile web).
+  # لما مفيش دومين بنشغّل app مباشرة على بورت 80 عبر البورت مابينج تحت
+  # (تتم إضافته في الأكشن بـ override بسيط).
   caddy:
     image: caddy:2-alpine
+    profiles: ["web"]
     restart: unless-stopped
     ports:
       - "80:80"

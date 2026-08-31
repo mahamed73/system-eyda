@@ -1,0 +1,118 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "تشغيل يدوي — اضغط Run مباشرة"
+        required: false
+        default: "deploy"
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: الاتصال بالسيرفر ونشر النظام
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            set -e
+            APP_DIR="/opt/clinic-saas"
+
+            echo "==> 1) تثبيت Docker لو مش موجود"
+            if ! command -v docker >/dev/null 2>&1; then
+              curl -fsSL https://get.docker.com | sh
+            fi
+            docker --version
+
+            echo "==> 2) جلب الكود من GitHub"
+            if [ ! -d "$APP_DIR/.git" ]; then
+              git clone https://github.com/mahamed73/system-eyda.git "$APP_DIR"
+            fi
+            cd "$APP_DIR"
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "==> 3) ملف الإعدادات (.env.docker)"
+            DOMAIN_VAL="${{ secrets.DOMAIN }}"
+            if [ ! -f .env.docker ]; then
+              RANDOM_SECRET=$(openssl rand -hex 32)
+              {
+                echo "DOMAIN=${DOMAIN_VAL}"
+                echo "LETSENCRYPT_EMAIL=${{ secrets.LETSENCRYPT_EMAIL }}"
+                echo "DB_PASSWORD=$RANDOM_SECRET"
+                echo "AUTH_SECRET=$RANDOM_SECRET"
+              } > .env.docker
+              echo "تم إنشاء .env.docker (DOMAIN=${DOMAIN_VAL:-فاضي = تشغيل على الـ IP)}"
+            else
+              echo ".env.docker موجود بالفعل — محتفظين به"
+            fi
+
+            echo "==> 4) وضع التشغيل: بدومين (Caddy+SSL) ولا بالـ IP مباشرة؟"
+            # ملف override لوضع "من غير دومين": التطبيق يباصي بورت 80 مباشرة
+            # ويكتب NEXTAUTH_URL بعنوان الـ IP. لو فيه دومين، Caddy بيتكفل بـ SSL.
+            if [ -n "$DOMAIN_VAL" ]; then
+              rm -f docker-compose.override.yml
+              UP_ARGS="--profile web"
+            else
+              cat > docker-compose.override.yml <<'YAML'
+            services:
+              app:
+                ports:
+                  - "80:3000"
+            YAML
+              sed -i 's#^NEXTAUTH_URL=.*#NEXTAUTH_URL=http://${{ secrets.DEPLOY_HOST }}#' .env.docker
+              UP_ARGS=""
+            fi
+
+            echo "==> 5) بناء وتشغيل الحاويات"
+            if docker compose version >/dev/null 2>&1; then
+              DC="docker compose --env-file .env.docker"
+            else
+              DC="docker-compose --env-file .env.docker"
+            fi
+            $DC $UP_ARGS up -d --build --remove-orphans
+
+            echo "==> 6) متابعة حالة الخدمات"
+            sleep 10
+            $DC $UP_ARGS ps || true
+
+            echo "==> 7) فحص التطبيق"
+            OK=0
+            for i in $(seq 1 25); do
+              CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/api/health || true)
+              echo "محاولة $i: HTTP $CODE"
+              if [ "$CODE" = "200" ]; then
+                OK=1
+                break
+              fi
+              sleep 6
+            done
+
+            if [ "$OK" = "1" ]; then
+              echo "✅ التطبيق شغال بنجاح"
+              if [ -n "$DOMAIN_VAL" ]; then
+                echo "الرابط: https://$DOMAIN_VAL"
+                echo "صفحة الحجز: https://$DOMAIN_VAL/b/<slug>"
+              else
+                echo "الرابط: http://${{ secrets.DEPLOY_HOST }}"
+                echo "صفحة الحجز: http://${{ secrets.DEPLOY_HOST }}/b/<slug>"
+              fi
+            else
+              echo "❌ التطبيق مش بيرد بـ 200 — شوف لوج الـ app:"
+              $DC $UP_ARGS logs --tail=50 app || true
+              exit 1
+            fi
+            echo "==> تم النشر ✅"
